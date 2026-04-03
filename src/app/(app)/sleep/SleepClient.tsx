@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { addSleepLog, deleteSleepLog } from './actions'
 
 const QUALITY_LABELS: Record<number, { label: string; emoji: string }> = {
@@ -32,6 +33,7 @@ function formatTime(iso: string): string {
 }
 
 export default function SleepClient({ logs }: { logs: SleepLog[] }) {
+  const router = useRouter()
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -50,6 +52,7 @@ export default function SleepClient({ logs }: { logs: SleepLog[] }) {
     setLoading(false)
     if (result?.error) { setError(result.error); return }
     setShowForm(false)
+    router.refresh()
   }
 
   return (
@@ -174,7 +177,7 @@ export default function SleepClient({ logs }: { logs: SleepLog[] }) {
                   <p className="text-xs text-gray-400">{log.quality}/5</p>
                 </div>
                 <button
-                  onClick={() => deleteSleepLog(log.id)}
+                  onClick={async () => { await deleteSleepLog(log.id); router.refresh() }}
                   className="text-gray-400 hover:text-red-500 transition text-xs"
                 >
                   Delete

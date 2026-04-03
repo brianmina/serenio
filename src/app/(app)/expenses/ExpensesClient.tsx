@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { addExpense, deleteExpense } from './actions'
 
 const CATEGORIES = ['Food', 'Transport', 'Health', 'Entertainment', 'Shopping', 'Bills', 'Other']
@@ -14,6 +15,7 @@ type Expense = {
 }
 
 export default function ExpensesClient({ expenses }: { expenses: Expense[] }) {
+  const router = useRouter()
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -29,10 +31,12 @@ export default function ExpensesClient({ expenses }: { expenses: Expense[] }) {
     setLoading(false)
     if (result?.error) { setError(result.error); return }
     setShowForm(false)
+    router.refresh()
   }
 
   async function handleDelete(id: string) {
     await deleteExpense(id)
+    router.refresh()
   }
 
   return (

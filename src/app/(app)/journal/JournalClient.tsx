@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { addEntry, deleteEntry, updateEntry } from './actions'
 
 const MOODS = [
@@ -24,6 +25,7 @@ type Entry = {
 }
 
 function EntryCard({ entry, onDelete }: { entry: Entry; onDelete: (id: string) => void }) {
+  const router = useRouter()
   const [editing, setEditing] = useState(false)
   const [loading, setLoading] = useState(false)
   const [expanded, setExpanded] = useState(false)
@@ -35,6 +37,7 @@ function EntryCard({ entry, onDelete }: { entry: Entry; onDelete: (id: string) =
     await updateEntry(entry.id, formData)
     setLoading(false)
     setEditing(false)
+    router.refresh()
   }
 
   if (editing) {
@@ -111,7 +114,7 @@ function EntryCard({ entry, onDelete }: { entry: Entry; onDelete: (id: string) =
             Edit
           </button>
           <button
-            onClick={() => onDelete(entry.id)}
+            onClick={async () => { await onDelete(entry.id); router.refresh() }}
             className="text-xs text-gray-400 hover:text-red-500 transition"
           >
             Delete
@@ -123,6 +126,7 @@ function EntryCard({ entry, onDelete }: { entry: Entry; onDelete: (id: string) =
 }
 
 export default function JournalClient({ entries }: { entries: Entry[] }) {
+  const router = useRouter()
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -136,6 +140,7 @@ export default function JournalClient({ entries }: { entries: Entry[] }) {
     setLoading(false)
     if (result?.error) { setError(result.error); return }
     setShowForm(false)
+    router.refresh()
   }
 
   return (

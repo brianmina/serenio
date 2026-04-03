@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { addFoodLog, deleteFoodLog } from './actions'
 
 const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack']
@@ -21,6 +22,7 @@ type FoodLog = {
 }
 
 export default function FoodClient({ logs }: { logs: FoodLog[] }) {
+  const router = useRouter()
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -45,6 +47,7 @@ export default function FoodClient({ logs }: { logs: FoodLog[] }) {
     setLoading(false)
     if (result?.error) { setError(result.error); return }
     setShowForm(false)
+    router.refresh()
   }
 
   return (
@@ -154,7 +157,7 @@ export default function FoodClient({ logs }: { logs: FoodLog[] }) {
                           <span className="text-sm font-medium text-gray-500">{log.calories} kcal</span>
                         )}
                         <button
-                          onClick={() => deleteFoodLog(log.id)}
+                          onClick={async () => { await deleteFoodLog(log.id); router.refresh() }}
                           className="text-gray-400 hover:text-red-500 transition text-xs"
                         >
                           Delete
