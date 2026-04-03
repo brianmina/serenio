@@ -5,6 +5,12 @@ export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('username')
+    .eq('id', user!.id)
+    .single()
+
   const today = new Date().toISOString().split('T')[0]
 
   const [
@@ -29,7 +35,7 @@ export default async function DashboardPage() {
   return (
     <div>
       <div className="mb-8">
-        <h2 className="text-2xl font-bold text-gray-800">Good day{user?.email ? `, ${user.email.split('@')[0]}` : ''}!</h2>
+        <h2 className="text-2xl font-bold text-gray-800">Good day{profile?.username ? `, ${profile.username}` : ''}!</h2>
         <p className="text-gray-500 mt-1">Here&apos;s your overview for today.</p>
       </div>
 

@@ -28,6 +28,17 @@ export default function SignupPage() {
 
         <form action={handleSubmit} className="space-y-4">
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+            <input
+              name="username"
+              type="text"
+              required
+              minLength={3}
+              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              placeholder="e.g. brian"
+            />
+          </div>
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
             <input
               name="email"
