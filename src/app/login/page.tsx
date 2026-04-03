@@ -30,7 +30,6 @@ export default function LoginPage() {
             </div>
           </div>
           <h1 className="text-3xl font-bold text-emerald-700">Serenio</h1>
-          <p className="text-gray-500 mt-1">Welcome back</p>
         </div>
 
         <form action={handleSubmit} className="space-y-4">
