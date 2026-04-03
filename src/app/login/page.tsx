@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { login } from '@/app/auth/actions'
 
 export default function LoginPage() {
@@ -22,6 +23,15 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md">
         <div className="text-center mb-8">
+          <div className="flex justify-center mb-4">
+            <Image
+              src="/avatar.jpg"
+              alt="Brian"
+              width={80}
+              height={80}
+              className="rounded-full object-cover ring-4 ring-emerald-100"
+            />
+          </div>
           <h1 className="text-3xl font-bold text-emerald-700">Serenio</h1>
           <p className="text-gray-500 mt-1">Welcome back</p>
         </div>
