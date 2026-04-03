@@ -159,30 +159,25 @@ export default function SleepClient({ logs }: { logs: SleepLog[] }) {
       ) : (
         <div className="space-y-3">
           {logs.map(log => (
-            <div key={log.id} className="bg-white rounded-xl border border-gray-200 px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition">
-              <div className="flex items-center gap-4">
-                <span className="text-3xl">{QUALITY_LABELS[log.quality]?.emoji}</span>
+            <div key={log.id} className="bg-white rounded-xl border border-gray-200 px-4 py-4 flex items-start justify-between gap-3 hover:bg-gray-50 transition">
+              <div className="flex items-start gap-3">
+                <span className="text-3xl mt-0.5">{QUALITY_LABELS[log.quality]?.emoji}</span>
                 <div>
                   <p className="text-sm font-semibold text-gray-800">{log.date}</p>
                   <p className="text-xs text-gray-500 mt-0.5">
                     {formatTime(log.bedtime)} → {formatTime(log.wake_time)}
                     <span className="ml-2 font-medium text-purple-600">{getDuration(log.bedtime, log.wake_time)}</span>
                   </p>
+                  <p className="text-xs text-gray-500 mt-0.5">{QUALITY_LABELS[log.quality]?.label} ({log.quality}/5)</p>
                   {log.notes && <p className="text-xs text-gray-400 mt-0.5 italic">{log.notes}</p>}
                 </div>
               </div>
-              <div className="flex items-center gap-4">
-                <div className="text-right">
-                  <p className="text-sm font-semibold text-gray-700">{QUALITY_LABELS[log.quality]?.label}</p>
-                  <p className="text-xs text-gray-400">{log.quality}/5</p>
-                </div>
-                <button
-                  onClick={async () => { await deleteSleepLog(log.id); router.refresh() }}
-                  className="text-gray-400 hover:text-red-500 transition text-xs"
-                >
-                  Delete
-                </button>
-              </div>
+              <button
+                onClick={async () => { await deleteSleepLog(log.id); router.refresh() }}
+                className="text-gray-400 hover:text-red-500 transition text-xs shrink-0 mt-1"
+              >
+                Delete
+              </button>
             </div>
           ))}
         </div>

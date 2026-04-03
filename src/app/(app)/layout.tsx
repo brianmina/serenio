@@ -12,8 +12,8 @@ const navItems = [
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      {/* Sidebar */}
-      <aside className="w-56 bg-white border-r border-gray-200 flex flex-col">
+      {/* Sidebar — desktop only */}
+      <aside className="hidden md:flex w-56 bg-white border-r border-gray-200 flex-col">
         <div className="p-6 border-b border-gray-100">
           <h1 className="text-xl font-bold text-emerald-700">Serenio</h1>
         </div>
@@ -42,9 +42,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 p-8 overflow-auto">
+      <main className="flex-1 p-4 md:p-8 overflow-auto pb-20 md:pb-8">
         {children}
       </main>
+
+      {/* Bottom nav — mobile only */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex z-50">
+        {navItems.map(item => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className="flex-1 flex flex-col items-center gap-0.5 py-2.5 text-gray-500 hover:text-emerald-700 transition"
+          >
+            <span className="text-xl">{item.icon}</span>
+            <span className="text-[10px] font-medium">{item.label}</span>
+          </Link>
+        ))}
+        <form action={logout} className="flex-1">
+          <button
+            type="submit"
+            className="w-full h-full flex flex-col items-center gap-0.5 py-2.5 text-gray-500 hover:text-red-500 transition"
+          >
+            <span className="text-xl">↩</span>
+            <span className="text-[10px] font-medium">Sign out</span>
+          </button>
+        </form>
+      </nav>
     </div>
   )
 }
