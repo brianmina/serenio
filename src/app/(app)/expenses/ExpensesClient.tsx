@@ -117,43 +117,65 @@ export default function ExpensesClient({ expenses }: { expenses: Expense[] }) {
           <p>No expenses yet. Add your first one!</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="text-left px-5 py-3 text-gray-500 font-medium">Date</th>
-                <th className="text-left px-5 py-3 text-gray-500 font-medium">Category</th>
-                <th className="text-left px-5 py-3 text-gray-500 font-medium">Description</th>
-                <th className="text-right px-5 py-3 text-gray-500 font-medium">Amount</th>
-                <th className="px-5 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {expenses.map(expense => (
-                <tr key={expense.id} className="hover:bg-gray-50 transition">
-                  <td className="px-5 py-3 text-gray-500">{expense.date}</td>
-                  <td className="px-5 py-3">
-                    <span className="bg-blue-100 text-blue-700 text-xs font-medium px-2.5 py-1 rounded-full">
-                      {expense.category}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3 text-gray-700">{expense.description || '—'}</td>
-                  <td className="px-5 py-3 text-right font-semibold text-gray-800">
-                    ${Number(expense.amount).toFixed(2)}
-                  </td>
-                  <td className="px-5 py-3 text-right">
-                    <button
-                      onClick={() => handleDelete(expense.id)}
-                      className="text-gray-400 hover:text-red-500 transition text-xs"
-                    >
-                      Delete
-                    </button>
-                  </td>
+        <>
+          {/* Card list — mobile */}
+          <div className="sm:hidden space-y-3">
+            {expenses.map(expense => (
+              <div key={expense.id} className="bg-white rounded-xl border border-gray-200 px-4 py-3 flex items-center justify-between">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="bg-blue-100 text-blue-700 text-xs font-medium px-2 py-0.5 rounded-full">{expense.category}</span>
+                    <span className="text-xs text-gray-400">{expense.date}</span>
+                  </div>
+                  <p className="text-sm text-gray-700 truncate">{expense.description || '—'}</p>
+                </div>
+                <div className="flex items-center gap-3 ml-3 shrink-0">
+                  <span className="font-semibold text-gray-800">${Number(expense.amount).toFixed(2)}</span>
+                  <button onClick={() => handleDelete(expense.id)} className="text-gray-400 hover:text-red-500 transition text-xs">Delete</button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Table — tablet and up */}
+          <div className="hidden sm:block bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="text-left px-5 py-3 text-gray-500 font-medium">Date</th>
+                  <th className="text-left px-5 py-3 text-gray-500 font-medium">Category</th>
+                  <th className="text-left px-5 py-3 text-gray-500 font-medium">Description</th>
+                  <th className="text-right px-5 py-3 text-gray-500 font-medium">Amount</th>
+                  <th className="px-5 py-3"></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {expenses.map(expense => (
+                  <tr key={expense.id} className="hover:bg-gray-50 transition">
+                    <td className="px-5 py-3 text-gray-500">{expense.date}</td>
+                    <td className="px-5 py-3">
+                      <span className="bg-blue-100 text-blue-700 text-xs font-medium px-2.5 py-1 rounded-full">
+                        {expense.category}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 text-gray-700">{expense.description || '—'}</td>
+                    <td className="px-5 py-3 text-right font-semibold text-gray-800">
+                      ${Number(expense.amount).toFixed(2)}
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      <button
+                        onClick={() => handleDelete(expense.id)}
+                        className="text-gray-400 hover:text-red-500 transition text-xs"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   )
