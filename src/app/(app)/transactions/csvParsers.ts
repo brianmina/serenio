@@ -202,7 +202,7 @@ function parseChimeText(text: string): ParsedTransaction[] {
 
 async function extractPDFText(buffer: ArrayBuffer): Promise<string> {
   const pdfjsLib = await import('pdfjs-dist')
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
 
   const pdf = await pdfjsLib.getDocument({ data: buffer }).promise
   const pageTexts: string[] = []
