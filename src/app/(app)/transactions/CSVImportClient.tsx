@@ -2,13 +2,35 @@
 
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { parseBofA, parseCapitalOne, parseChime, type ParsedTransaction } from './csvParsers'
+import {
+  parseBofA, parseBofAExcel,
+  parseCapitalOnePDF, parseChimePDF,
+  type ParsedTransaction,
+} from './csvParsers'
 import { importTransactions } from './actions'
 
 const BANKS = [
-  { id: 'bofa', label: 'Bank of America', hint: 'Download from: Account Activity → Download → CSV' },
-  { id: 'capitalone', label: 'Capital One', hint: 'Download from: Account → Download Transactions → CSV' },
-  { id: 'chime', label: 'Chime (converted)', hint: 'Chime is PDF only — convert at docuclipper.com first, then upload the CSV' },
+  {
+    id: 'bofa',
+    label: 'Bank of America',
+    accept: '.xls,.xlsx,.csv',
+    hint: 'Download: Account → Download → Microsoft Excel or CSV',
+    fileLabel: 'Upload Excel or CSV file',
+  },
+  {
+    id: 'capitalone',
+    label: 'Capital One',
+    accept: '.pdf',
+    hint: 'Download: Account → Statements → Download PDF statement',
+    fileLabel: 'Upload PDF statement',
+  },
+  {
+    id: 'chime',
+    label: 'Chime',
+    accept: '.pdf',
+    hint: 'Download: Chime app → Settings → Documents → Download monthly PDF',
+    fileLabel: 'Upload PDF statement',
+  },
 ] as const
 
 type BankId = typeof BANKS[number]['id']
@@ -22,33 +44,54 @@ export default function CSVImportClient({ onClose }: { onClose: () => void }) {
   const [bank, setBank] = useState<BankId>('bofa')
   const [rows, setRows] = useState<ParsedTransaction[]>([])
   const [parseError, setParseError] = useState<string | null>(null)
+  const [parsing, setParsing] = useState(false)
   const [importing, setImporting] = useState(false)
   const [imported, setImported] = useState(false)
 
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+  const selectedBank = BANKS.find(b => b.id === bank)!
+
+  function resetFile() {
+    setRows([])
+    setParseError(null)
+    setImported(false)
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    setParseError(null)
-    setRows([])
-    setImported(false)
-    const reader = new FileReader()
-    reader.onload = (ev) => {
-      const text = ev.target?.result as string
-      try {
-        let parsed: ParsedTransaction[]
-        if (bank === 'bofa') parsed = parseBofA(text)
-        else if (bank === 'capitalone') parsed = parseCapitalOne(text)
-        else parsed = parseChime(text)
-        if (parsed.length === 0) {
-          setParseError('No transactions found. Make sure you selected the right bank format.')
-          return
+    resetFile()
+    setParsing(true)
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase()
+      let parsed: ParsedTransaction[] = []
+
+      if (bank === 'bofa') {
+        if (ext === 'csv') {
+          const text = await file.text()
+          parsed = parseBofA(text)
+        } else {
+          const buf = await file.arrayBuffer()
+          parsed = await parseBofAExcel(buf)
         }
-        setRows(parsed)
-      } catch (err) {
-        setParseError(err instanceof Error ? err.message : 'Failed to parse file.')
+      } else if (bank === 'capitalone') {
+        const buf = await file.arrayBuffer()
+        parsed = await parseCapitalOnePDF(buf)
+      } else {
+        const buf = await file.arrayBuffer()
+        parsed = await parseChimePDF(buf)
       }
+
+      if (parsed.length === 0) {
+        setParseError('No transactions found. Make sure you selected the correct bank and file.')
+        return
+      }
+      setRows(parsed)
+    } catch (err) {
+      setParseError(err instanceof Error ? err.message : 'Failed to parse file.')
+    } finally {
+      setParsing(false)
     }
-    reader.readAsText(file)
   }
 
   function updateCategory(idx: number, category: string) {
@@ -56,11 +99,7 @@ export default function CSVImportClient({ onClose }: { onClose: () => void }) {
   }
 
   function updateType(idx: number, type: 'income' | 'expense') {
-    setRows(prev => prev.map((r, i) => i === idx ? {
-      ...r,
-      type,
-      category: type === 'income' ? 'Other' : 'Other',
-    } : r))
+    setRows(prev => prev.map((r, i) => i === idx ? { ...r, type, category: 'Other' } : r))
   }
 
   function removeRow(idx: number) {
@@ -71,21 +110,19 @@ export default function CSVImportClient({ onClose }: { onClose: () => void }) {
     setImporting(true)
     const result = await importTransactions(rows)
     setImporting(false)
-    if (result?.error) {
-      setParseError(result.error)
-      return
-    }
+    if (result?.error) { setParseError(result.error); return }
     setImported(true)
     router.refresh()
-    setTimeout(() => { onClose() }, 1500)
+    setTimeout(() => onClose(), 1500)
   }
 
-  const selectedBank = BANKS.find(b => b.id === bank)!
+  const totalIncome = rows.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0)
+  const totalExpense = rows.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0)
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 space-y-5">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-gray-700 text-lg">Import from Bank CSV</h3>
+        <h3 className="font-semibold text-gray-700 text-lg">Import from Bank Statement</h3>
         <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
       </div>
 
@@ -97,9 +134,11 @@ export default function CSVImportClient({ onClose }: { onClose: () => void }) {
             <button
               key={b.id}
               type="button"
-              onClick={() => { setBank(b.id); setRows([]); setParseError(null); if (fileRef.current) fileRef.current.value = '' }}
+              onClick={() => { setBank(b.id); resetFile() }}
               className={`px-4 py-2 rounded-lg text-sm font-medium border transition ${
-                bank === b.id ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-300'
+                bank === b.id
+                  ? 'bg-emerald-600 text-white border-emerald-600'
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-300'
               }`}
             >
               {b.label}
@@ -111,15 +150,19 @@ export default function CSVImportClient({ onClose }: { onClose: () => void }) {
 
       {/* File upload */}
       <div>
-        <label className="block text-sm font-medium text-gray-600 mb-1">Upload CSV file</label>
+        <label className="block text-sm font-medium text-gray-600 mb-1">{selectedBank.fileLabel}</label>
         <input
           ref={fileRef}
           type="file"
-          accept=".csv"
+          accept={selectedBank.accept}
           onChange={handleFile}
           className="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
         />
       </div>
+
+      {parsing && (
+        <div className="text-sm text-gray-500 animate-pulse">Reading file...</div>
+      )}
 
       {parseError && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-600">
@@ -140,7 +183,7 @@ export default function CSVImportClient({ onClose }: { onClose: () => void }) {
             <p className="text-sm font-medium text-gray-700">
               Preview — <span className="text-emerald-600">{rows.length} transactions found</span>
             </p>
-            <p className="text-xs text-gray-400">You can adjust type/category before importing</p>
+            <p className="text-xs text-gray-400">Adjust type or category before importing</p>
           </div>
 
           <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -160,7 +203,7 @@ export default function CSVImportClient({ onClose }: { onClose: () => void }) {
                   {rows.map((row, idx) => (
                     <tr key={idx} className="hover:bg-gray-50">
                       <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{row.date}</td>
-                      <td className="px-3 py-2 text-gray-700 max-w-[180px] truncate">{row.description}</td>
+                      <td className="px-3 py-2 text-gray-700 max-w-[180px] truncate" title={row.description}>{row.description}</td>
                       <td className="px-3 py-2">
                         <select
                           value={row.type}
@@ -199,8 +242,9 @@ export default function CSVImportClient({ onClose }: { onClose: () => void }) {
 
           <div className="flex items-center justify-between mt-4">
             <p className="text-xs text-gray-400">
-              Income: <span className="text-blue-600 font-medium">${rows.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0).toFixed(2)}</span>
-              {' '}· Expenses: <span className="text-orange-600 font-medium">${rows.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0).toFixed(2)}</span>
+              Income: <span className="text-blue-600 font-medium">${totalIncome.toFixed(2)}</span>
+              {' · '}
+              Expenses: <span className="text-orange-600 font-medium">${totalExpense.toFixed(2)}</span>
             </p>
             <button
               onClick={handleImport}
