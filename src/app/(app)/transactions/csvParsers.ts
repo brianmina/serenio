@@ -143,37 +143,6 @@ export function parseCapitalOneCSV(text: string): ParsedTransaction[] {
   return results
 }
 
-// ── Capital One — PDF ─────────────────────────────────────────────────────────
-
-export async function parseCapitalOnePDF(buffer: ArrayBuffer): Promise<ParsedTransaction[]> {
-  const text = await extractPDFText(buffer)
-  return parseCapitalOneText(text)
-}
-
-function parseCapitalOneText(text: string): ParsedTransaction[] {
-  const results: ParsedTransaction[] = []
-  // Capital One statement lines: "01/15/2024  AMAZON.COM  Shopping  -$25.99"
-  // Try multiple amount patterns
-  const lines = text.split('\n')
-  for (const line of lines) {
-    // Date at start: MM/DD/YYYY or MM/DD
-    const m = line.match(/(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\s+(.+?)\s+(-?\$?[\d,]+\.\d{2})\s*$/)
-    if (!m) continue
-    let rawDate = m[1]
-    // Add current year if missing
-    if (!/\d{4}/.test(rawDate)) rawDate += `/${new Date().getFullYear()}`
-    const date = toISO(rawDate.replace(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/, (_, mo, d, y) =>
-      `${mo}/${d}/${y.length === 2 ? '20' + y : y}`
-    ))
-    const description = m[2].replace(/\s{2,}/g, ' ').trim()
-    const rawAmt = parseFloat(m[3].replace(/[$,]/g, ''))
-    if (isNaN(rawAmt) || !description) continue
-    const type: 'income' | 'expense' = rawAmt < 0 ? 'income' : 'expense'
-    results.push({ date, description, amount: Math.abs(rawAmt), type, category: autoCategory(description, type) })
-  }
-  return results
-}
-
 // ── Chime — PDF ───────────────────────────────────────────────────────────────
 // Columns: TRANSACTION DATE | DESCRIPTION | TYPE | AMOUNT | ACCOUNT | SETTLEMENT DATE
 
