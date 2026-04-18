@@ -153,12 +153,12 @@ export async function parseChimePDF(buffer: ArrayBuffer): Promise<ParsedTransact
   const pdf = await pdfjsLib.getDocument({ data: buffer }).promise
   const results: ParsedTransaction[] = []
 
-  type TItem = { str: string; transform: number[] }
+  type TItem = { str: string; transform: number[]; dir: string; width: number; height: number; fontName: string; hasEOL: boolean }
 
   for (let p = 1; p <= pdf.numPages; p++) {
     const page = await pdf.getPage(p)
     const content = await page.getTextContent()
-    const items = content.items.filter((i): i is TItem => 'str' in i && i.str.trim() !== '')
+    const items = content.items.filter((i): i is TItem => 'str' in i && (i as TItem).str.trim() !== '')
 
     // Group into rows by y-position (tolerance 4)
     const rows: { y: number; parts: { x: number; str: string }[] }[] = []
