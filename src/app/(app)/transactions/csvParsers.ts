@@ -175,82 +175,85 @@ function parseCapitalOneText(text: string): ParsedTransaction[] {
 }
 
 // ── Chime — PDF ───────────────────────────────────────────────────────────────
+// Columns: TRANSACTION DATE | DESCRIPTION | TYPE | AMOUNT | ACCOUNT | SETTLEMENT DATE
 
 export async function parseChimePDF(buffer: ArrayBuffer): Promise<ParsedTransaction[]> {
-  const lines = await extractPDFLines(buffer)
-  return parseChimeLines(lines)
-}
-
-function parseChimeLines(lines: string[]): ParsedTransaction[] {
-  const results: ParsedTransaction[] = []
-
-  // Date patterns Chime uses: MM/DD/YYYY, MM/DD/YY, Jan 15 2024, Jan 15, 2024, January 15 2024
-  const dateRe = /(\d{1,2}\/\d{1,2}\/\d{2,4}|[A-Za-z]+\s+\d{1,2},?\s+\d{4})/
-  // Amount: optional sign, optional $, digits with commas, decimal
-  const amtRe  = /(-?\+?\$?[\d,]+\.\d{2})/g
-
-  for (const line of lines) {
-    const dateMatch = line.match(dateRe)
-    if (!dateMatch) continue
-
-    const amounts = [...line.matchAll(amtRe)]
-    if (amounts.length === 0) continue
-
-    // First amount is the transaction amount; last may be running balance — take first
-    const rawAmt = parseFloat(amounts[0][1].replace(/[$+,]/g, ''))
-    if (isNaN(rawAmt)) continue
-
-    // Description = text between end of date match and start of first amount
-    const dateEnd = (dateMatch.index ?? 0) + dateMatch[0].length
-    const amtStart = amounts[0].index ?? line.length
-    const description = line.slice(dateEnd, amtStart).trim().replace(/\s{2,}/g, ' ')
-    if (!description) continue
-
-    const date = toISO(dateMatch[1])
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue  // skip unparseable dates
-
-    const type: 'income' | 'expense' = rawAmt >= 0 ? 'income' : 'expense'
-    results.push({ date, description, amount: Math.abs(rawAmt), type, category: autoCategory(description, type) })
-  }
-  return results
-}
-
-// ── PDF text extraction (browser only) ───────────────────────────────────────
-
-async function extractPDFLines(buffer: ArrayBuffer): Promise<string[]> {
   const pdfjsLib = await import('pdfjs-dist')
   pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
 
   const pdf = await pdfjsLib.getDocument({ data: buffer }).promise
-  const allLines: string[] = []
+  const results: ParsedTransaction[] = []
+
+  type TItem = { str: string; transform: number[] }
 
   for (let p = 1; p <= pdf.numPages; p++) {
     const page = await pdf.getPage(p)
     const content = await page.getTextContent()
-
-    type TItem = { str: string; transform: number[] }
     const items = content.items.filter((i): i is TItem => 'str' in i && i.str.trim() !== '')
 
-    // Group items into rows using y-position with a tolerance of 4 units
+    // Group into rows by y-position (tolerance 4)
     const rows: { y: number; parts: { x: number; str: string }[] }[] = []
     for (const item of items) {
       const y = item.transform[5]
       const x = item.transform[4]
       const row = rows.find(r => Math.abs(r.y - y) <= 4)
-      if (row) {
-        row.parts.push({ x, str: item.str })
-      } else {
-        rows.push({ y, parts: [{ x, str: item.str }] })
-      }
+      if (row) row.parts.push({ x, str: item.str })
+      else rows.push({ y, parts: [{ x, str: item.str }] })
+    }
+    rows.sort((a, b) => b.y - a.y)
+    for (const row of rows) row.parts.sort((a, b) => a.x - b.x)
+
+    // Find header row to get column x-positions
+    const headerRow = rows.find(r =>
+      r.parts.some(p => /TRANSACTION.?DATE/i.test(p.str)) &&
+      r.parts.some(p => /DESCRIPTION/i.test(p.str))
+    )
+    if (!headerRow) continue
+
+    const colX = {
+      date:   headerRow.parts.find(p => /TRANSACTION.?DATE/i.test(p.str))?.x ?? 0,
+      desc:   headerRow.parts.find(p => /DESCRIPTION/i.test(p.str))?.x ?? 150,
+      type:   headerRow.parts.find(p => /^TYPE$/i.test(p.str.trim()))?.x ?? 350,
+      amount: headerRow.parts.find(p => /^AMOUNT$/i.test(p.str.trim()))?.x ?? 450,
     }
 
-    // Sort rows top-to-bottom, parts left-to-right
-    rows.sort((a, b) => b.y - a.y)
-    for (const row of rows) {
-      row.parts.sort((a, b) => a.x - b.x)
-      allLines.push(row.parts.map(p => p.str).join(' '))
+    const headerY = headerRow.y
+    const dataRows = rows.filter(r => r.y < headerY - 5)
+
+    for (const row of dataRows) {
+      // Assign each text part to nearest column
+      const get = (targetX: number, nextX: number) =>
+        row.parts
+          .filter(p => p.x >= targetX - 20 && p.x < nextX - 10)
+          .map(p => p.str).join(' ').trim()
+
+      const dateStr  = get(colX.date,   colX.desc)
+      const descStr  = get(colX.desc,   colX.type)
+      const typeStr  = get(colX.type,   colX.amount)
+      const amtStr   = row.parts.filter(p => p.x >= colX.amount - 10).map(p => p.str).join('').trim()
+
+      if (!dateStr || !descStr || !amtStr) continue
+
+      const date = toISO(dateStr)
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue
+
+      const rawAmt = parseFloat(amtStr.replace(/[$,+]/g, ''))
+      if (isNaN(rawAmt)) continue
+
+      // TYPE column: "Credit"/"Direct Deposit" = income, everything else = expense
+      const isIncome = /credit|deposit|refund|cashback/i.test(typeStr)
+      const type: 'income' | 'expense' = isIncome ? 'income' : 'expense'
+
+      results.push({
+        date,
+        description: descStr,
+        amount: Math.abs(rawAmt),
+        type,
+        category: autoCategory(descStr, type),
+      })
     }
   }
 
-  return allLines
+  return results
 }
+
