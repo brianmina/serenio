@@ -114,6 +114,35 @@ export async function parseBofAExcel(buffer: ArrayBuffer): Promise<ParsedTransac
   return results
 }
 
+// ── Capital One — CSV ─────────────────────────────────────────────────────────
+
+export function parseCapitalOneCSV(text: string): ParsedTransaction[] {
+  const lines = text.replace(/\r/g, '').split('\n').filter(l => l.trim())
+  const headerIdx = lines.findIndex(l => /transaction.?date/i.test(l))
+  if (headerIdx === -1) throw new Error('Could not find header row. Make sure this is a Capital One CSV file.')
+  const header = parseCSVLine(lines[headerIdx]).map(h => h.toLowerCase().trim())
+  const dateCol   = header.findIndex(h => h.includes('transaction') && h.includes('date'))
+  const descCol   = header.findIndex(h => h.includes('description'))
+  const debitCol  = header.findIndex(h => h === 'debit')
+  const creditCol = header.findIndex(h => h === 'credit')
+  const results: ParsedTransaction[] = []
+  for (let i = headerIdx + 1; i < lines.length; i++) {
+    const cols = parseCSVLine(lines[i])
+    if (cols.length < 4) continue
+    const date = toISO(cols[dateCol])
+    const description = cols[descCol]
+    const debit  = parseFloat((cols[debitCol]  || '').replace(/[$,]/g, ''))
+    const credit = parseFloat((cols[creditCol] || '').replace(/[$,]/g, ''))
+    if (!date || !description) continue
+    if (!isNaN(debit) && debit > 0) {
+      results.push({ date, description, amount: debit, type: 'expense', category: autoCategory(description, 'expense') })
+    } else if (!isNaN(credit) && credit > 0) {
+      results.push({ date, description, amount: credit, type: 'income', category: autoCategory(description, 'income') })
+    }
+  }
+  return results
+}
+
 // ── Capital One — PDF ─────────────────────────────────────────────────────────
 
 export async function parseCapitalOnePDF(buffer: ArrayBuffer): Promise<ParsedTransaction[]> {

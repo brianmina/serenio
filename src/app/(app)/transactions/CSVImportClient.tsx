@@ -4,7 +4,7 @@ import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   parseBofA, parseBofAExcel,
-  parseCapitalOnePDF, parseChimePDF,
+  parseCapitalOneCSV, parseChimePDF,
   type ParsedTransaction,
 } from './csvParsers'
 import { importTransactions } from './actions'
@@ -20,15 +20,15 @@ const BANKS = [
   {
     id: 'capitalone',
     label: 'Capital One',
-    accept: '.pdf',
-    hint: 'Download: Account → Statements → Download PDF statement',
-    fileLabel: 'Upload PDF statement',
+    accept: '.csv',
+    hint: 'Download: capitalone.com → Account → Download Transactions → CSV',
+    fileLabel: 'Upload CSV file',
   },
   {
     id: 'chime',
     label: 'Chime',
     accept: '.pdf',
-    hint: 'Download: Chime app → Settings → Documents → Download monthly PDF',
+    hint: 'Chime only exports PDF — App → Settings → Documents → Download monthly statement',
     fileLabel: 'Upload PDF statement',
   },
 ] as const
@@ -75,8 +75,8 @@ export default function CSVImportClient({ onClose }: { onClose: () => void }) {
           parsed = await parseBofAExcel(buf)
         }
       } else if (bank === 'capitalone') {
-        const buf = await file.arrayBuffer()
-        parsed = await parseCapitalOnePDF(buf)
+        const text = await file.text()
+        parsed = parseCapitalOneCSV(text)
       } else {
         const buf = await file.arrayBuffer()
         parsed = await parseChimePDF(buf)
