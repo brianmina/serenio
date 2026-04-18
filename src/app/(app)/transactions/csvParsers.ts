@@ -177,21 +177,38 @@ function parseCapitalOneText(text: string): ParsedTransaction[] {
 // ── Chime — PDF ───────────────────────────────────────────────────────────────
 
 export async function parseChimePDF(buffer: ArrayBuffer): Promise<ParsedTransaction[]> {
-  const text = await extractPDFText(buffer)
-  return parseChimeText(text)
+  const lines = await extractPDFLines(buffer)
+  return parseChimeLines(lines)
 }
 
-function parseChimeText(text: string): ParsedTransaction[] {
+function parseChimeLines(lines: string[]): ParsedTransaction[] {
   const results: ParsedTransaction[] = []
-  const lines = text.split('\n')
+
+  // Date patterns Chime uses: MM/DD/YYYY, MM/DD/YY, Jan 15 2024, Jan 15, 2024, January 15 2024
+  const dateRe = /(\d{1,2}\/\d{1,2}\/\d{2,4}|[A-Za-z]+\s+\d{1,2},?\s+\d{4})/
+  // Amount: optional sign, optional $, digits with commas, decimal
+  const amtRe  = /(-?\+?\$?[\d,]+\.\d{2})/g
+
   for (const line of lines) {
-    // Chime: "Jan 15, 2024  Amazon  -$25.99  $1,234.56"
-    const m = line.match(/^([A-Za-z]{3}\s+\d{1,2},?\s+\d{4})\s+(.+?)\s+(-?\$?[\d,]+\.\d{2})/)
-    if (!m) continue
-    const date = toISO(m[1])
-    const description = m[2].trim()
-    const rawAmt = parseFloat(m[3].replace(/[$,]/g, ''))
-    if (isNaN(rawAmt) || !description) continue
+    const dateMatch = line.match(dateRe)
+    if (!dateMatch) continue
+
+    const amounts = [...line.matchAll(amtRe)]
+    if (amounts.length === 0) continue
+
+    // First amount is the transaction amount; last may be running balance — take first
+    const rawAmt = parseFloat(amounts[0][1].replace(/[$+,]/g, ''))
+    if (isNaN(rawAmt)) continue
+
+    // Description = text between end of date match and start of first amount
+    const dateEnd = (dateMatch.index ?? 0) + dateMatch[0].length
+    const amtStart = amounts[0].index ?? line.length
+    const description = line.slice(dateEnd, amtStart).trim().replace(/\s{2,}/g, ' ')
+    if (!description) continue
+
+    const date = toISO(dateMatch[1])
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue  // skip unparseable dates
+
     const type: 'income' | 'expense' = rawAmt >= 0 ? 'income' : 'expense'
     results.push({ date, description, amount: Math.abs(rawAmt), type, category: autoCategory(description, type) })
   }
@@ -200,30 +217,40 @@ function parseChimeText(text: string): ParsedTransaction[] {
 
 // ── PDF text extraction (browser only) ───────────────────────────────────────
 
-async function extractPDFText(buffer: ArrayBuffer): Promise<string> {
+async function extractPDFLines(buffer: ArrayBuffer): Promise<string[]> {
   const pdfjsLib = await import('pdfjs-dist')
   pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
 
   const pdf = await pdfjsLib.getDocument({ data: buffer }).promise
-  const pageTexts: string[] = []
+  const allLines: string[] = []
 
   for (let p = 1; p <= pdf.numPages; p++) {
     const page = await pdf.getPage(p)
     const content = await page.getTextContent()
-    // Group text items by approximate y-position to reconstruct lines
-    const byY: Record<number, string[]> = {}
-    for (const item of content.items) {
-      if (!('str' in item)) continue
-      const y = Math.round((item as { transform: number[] }).transform[5])
-      if (!byY[y]) byY[y] = []
-      byY[y].push(item.str)
+
+    type TItem = { str: string; transform: number[] }
+    const items = content.items.filter((i): i is TItem => 'str' in i && i.str.trim() !== '')
+
+    // Group items into rows using y-position with a tolerance of 4 units
+    const rows: { y: number; parts: { x: number; str: string }[] }[] = []
+    for (const item of items) {
+      const y = item.transform[5]
+      const x = item.transform[4]
+      const row = rows.find(r => Math.abs(r.y - y) <= 4)
+      if (row) {
+        row.parts.push({ x, str: item.str })
+      } else {
+        rows.push({ y, parts: [{ x, str: item.str }] })
+      }
     }
-    const lines = Object.keys(byY)
-      .map(Number)
-      .sort((a, b) => b - a)
-      .map(y => byY[y].join(' '))
-    pageTexts.push(lines.join('\n'))
+
+    // Sort rows top-to-bottom, parts left-to-right
+    rows.sort((a, b) => b.y - a.y)
+    for (const row of rows) {
+      row.parts.sort((a, b) => a.x - b.x)
+      allLines.push(row.parts.map(p => p.str).join(' '))
+    }
   }
 
-  return pageTexts.join('\n')
+  return allLines
 }
