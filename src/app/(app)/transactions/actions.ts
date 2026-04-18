@@ -3,26 +3,31 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 
-export async function addExpense(formData: FormData) {
+export async function addTransaction(formData: FormData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
-  const { error } = await supabase.from('expenses').insert({
+  const { error } = await supabase.from('transactions').insert({
     user_id: user.id,
+    type: formData.get('type') as string,
     amount: parseFloat(formData.get('amount') as string),
     category: formData.get('category') as string,
-    description: formData.get('description') as string,
+    description: formData.get('description') as string || null,
     date: formData.get('date') as string,
   })
 
   if (error) return { error: error.message }
-  revalidatePath('/expenses')
+  revalidatePath('/transactions')
+  revalidatePath('/dashboard')
+  revalidatePath('/reports')
 }
 
-export async function deleteExpense(id: string) {
+export async function deleteTransaction(id: string) {
   const supabase = await createClient()
-  const { error } = await supabase.from('expenses').delete().eq('id', id)
+  const { error } = await supabase.from('transactions').delete().eq('id', id)
   if (error) return { error: error.message }
-  revalidatePath('/expenses')
+  revalidatePath('/transactions')
+  revalidatePath('/dashboard')
+  revalidatePath('/reports')
 }

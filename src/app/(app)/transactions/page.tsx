@@ -1,16 +1,16 @@
 import { createClient } from '@/lib/supabase/server'
-import JournalClient from './JournalClient'
+import TransactionsClient from './TransactionsClient'
 
-export default async function JournalPage() {
+export default async function TransactionsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { data: entries } = await supabase
-    .from('journal_entries')
+  const { data } = await supabase
+    .from('transactions')
     .select('*')
     .eq('user_id', user!.id)
     .order('date', { ascending: false })
     .order('created_at', { ascending: false })
 
-  return <JournalClient entries={entries ?? []} />
+  return <TransactionsClient transactions={data ?? []} />
 }

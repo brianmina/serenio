@@ -27,7 +27,7 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  const protectedRoutes = ['/dashboard', '/expenses', '/food', '/sleep', '/journal']
+  const protectedRoutes = ['/dashboard', '/transactions', '/budgets', '/reports']
   const isProtected = protectedRoutes.some(route => pathname.startsWith(route))
 
   if (isProtected && !user) {

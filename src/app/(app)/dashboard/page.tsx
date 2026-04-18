@@ -11,45 +11,147 @@ export default async function DashboardPage() {
     .eq('id', user!.id)
     .single()
 
-  const today = new Date().toISOString().split('T')[0]
+  const now = new Date()
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+  const today = now.toISOString().split('T')[0]
 
-  const [
-    { count: expenseCount },
-    { count: foodCount },
-    { count: sleepCount },
-    { count: journalCount },
-  ] = await Promise.all([
-    supabase.from('expenses').select('*', { count: 'exact', head: true }).eq('date', today),
-    supabase.from('food_logs').select('*', { count: 'exact', head: true }).eq('date', today),
-    supabase.from('sleep_logs').select('*', { count: 'exact', head: true }).eq('date', today),
-    supabase.from('journal_entries').select('*', { count: 'exact', head: true }).eq('date', today),
-  ])
+  const { data: monthTransactions } = await supabase
+    .from('transactions')
+    .select('type, amount, category, description, date')
+    .gte('date', monthStart)
+    .lte('date', today)
+    .order('date', { ascending: false })
 
-  const cards = [
-    { label: 'Expenses', icon: '💰', count: expenseCount ?? 0, unit: 'entries today', href: '/expenses', color: 'bg-blue-50 text-blue-700' },
-    { label: 'Food', icon: '🥗', count: foodCount ?? 0, unit: 'meals today', href: '/food', color: 'bg-green-50 text-green-700' },
-    { label: 'Sleep', icon: '😴', count: sleepCount ?? 0, unit: 'logs today', href: '/sleep', color: 'bg-purple-50 text-purple-700' },
-    { label: 'Journal', icon: '📓', count: journalCount ?? 0, unit: 'entries today', href: '/journal', color: 'bg-yellow-50 text-yellow-700' },
-  ]
+  const transactions = monthTransactions ?? []
+
+  const totalIncome = transactions
+    .filter(t => t.type === 'income')
+    .reduce((sum, t) => sum + Number(t.amount), 0)
+
+  const totalExpenses = transactions
+    .filter(t => t.type === 'expense')
+    .reduce((sum, t) => sum + Number(t.amount), 0)
+
+  const netBalance = totalIncome - totalExpenses
+
+  // Spending by category this month
+  const byCategory = transactions
+    .filter(t => t.type === 'expense')
+    .reduce<Record<string, number>>((acc, t) => {
+      acc[t.category] = (acc[t.category] ?? 0) + Number(t.amount)
+      return acc
+    }, {})
+
+  const topCategories = Object.entries(byCategory)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+
+  const recent = transactions.slice(0, 5)
+
+  const monthName = now.toLocaleString('default', { month: 'long', year: 'numeric' })
 
   return (
-    <div>
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold text-gray-800">Good day{profile?.username ? `, ${profile.username}` : ''}!</h2>
-        <p className="text-gray-500 mt-1">Here&apos;s your overview for today.</p>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-800">
+          Good day{profile?.username ? `, ${profile.username}` : ''}!
+        </h2>
+        <p className="text-gray-500 mt-1 text-sm">{monthName} overview</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {cards.map(card => (
-          <Link key={card.href} href={card.href}>
-            <div className={`rounded-xl p-6 ${card.color} hover:scale-105 transition-transform cursor-pointer`}>
-              <div className="text-3xl mb-3">{card.icon}</div>
-              <div className="text-2xl font-bold">{card.count}</div>
-              <div className="text-sm font-medium mt-1">{card.unit}</div>
-              <div className="text-sm font-semibold mt-2">{card.label} →</div>
+      {/* Summary cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className={`rounded-xl p-6 ${netBalance >= 0 ? 'bg-emerald-50' : 'bg-red-50'}`}>
+          <p className="text-sm font-medium text-gray-500">Net Balance</p>
+          <p className={`text-3xl font-bold mt-1 ${netBalance >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+            {netBalance < 0 ? '-' : ''}${Math.abs(netBalance).toFixed(2)}
+          </p>
+          <p className="text-xs text-gray-400 mt-1">Income minus expenses</p>
+        </div>
+        <div className="rounded-xl p-6 bg-blue-50">
+          <p className="text-sm font-medium text-gray-500">Total Income</p>
+          <p className="text-3xl font-bold mt-1 text-blue-700">${totalIncome.toFixed(2)}</p>
+          <p className="text-xs text-gray-400 mt-1">This month</p>
+        </div>
+        <div className="rounded-xl p-6 bg-orange-50">
+          <p className="text-sm font-medium text-gray-500">Total Expenses</p>
+          <p className="text-3xl font-bold mt-1 text-orange-600">${totalExpenses.toFixed(2)}</p>
+          <p className="text-xs text-gray-400 mt-1">This month</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Top spending categories */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-gray-700">Top Spending Categories</h3>
+            <Link href="/reports" className="text-xs text-emerald-600 hover:underline">View all →</Link>
+          </div>
+          {topCategories.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-4">No expenses this month</p>
+          ) : (
+            <div className="space-y-3">
+              {topCategories.map(([category, amount]) => {
+                const pct = totalExpenses > 0 ? (amount / totalExpenses) * 100 : 0
+                return (
+                  <div key={category}>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-gray-600 font-medium">{category}</span>
+                      <span className="text-gray-800 font-semibold">${amount.toFixed(2)}</span>
+                    </div>
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-emerald-500 rounded-full"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
             </div>
-          </Link>
-        ))}
+          )}
+        </div>
+
+        {/* Recent transactions */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-gray-700">Recent Transactions</h3>
+            <Link href="/transactions" className="text-xs text-emerald-600 hover:underline">View all →</Link>
+          </div>
+          {recent.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-4">No transactions this month</p>
+          ) : (
+            <div className="space-y-3">
+              {recent.map((t, i) => (
+                <div key={i} className="flex items-center justify-between">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-700 truncate">{t.description || t.category}</p>
+                    <p className="text-xs text-gray-400">{t.date} · {t.category}</p>
+                  </div>
+                  <span className={`text-sm font-semibold ml-3 shrink-0 ${t.type === 'income' ? 'text-blue-600' : 'text-orange-600'}`}>
+                    {t.type === 'income' ? '+' : '-'}${Number(t.amount).toFixed(2)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Quick actions */}
+      <div className="flex gap-3 flex-wrap">
+        <Link
+          href="/transactions"
+          className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition"
+        >
+          + Add Transaction
+        </Link>
+        <Link
+          href="/budgets"
+          className="bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-sm font-semibold px-5 py-2.5 rounded-lg transition"
+        >
+          Manage Budgets
+        </Link>
       </div>
     </div>
   )

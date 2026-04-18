@@ -2,20 +2,20 @@ import Link from 'next/link'
 import { logout } from '@/app/auth/actions'
 
 const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: '🏠' },
-  { href: '/expenses', label: 'Expenses', icon: '💰' },
-  { href: '/food', label: 'Food', icon: '🥗' },
-  { href: '/sleep', label: 'Sleep', icon: '😴' },
-  { href: '/journal', label: 'Journal', icon: '📓' },
+  { href: '/dashboard', label: 'Dashboard', icon: '📊' },
+  { href: '/transactions', label: 'Transactions', icon: '💸' },
+  { href: '/budgets', label: 'Budgets', icon: '🎯' },
+  { href: '/reports', label: 'Reports', icon: '📈' },
 ]
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar — desktop only */}
       <aside className="hidden md:flex w-56 bg-white border-r border-gray-200 flex-col">
         <div className="p-6 border-b border-gray-100">
           <h1 className="text-xl font-bold text-emerald-700">Serenio</h1>
+          <p className="text-xs text-gray-400 mt-0.5">Finance Tracker</p>
         </div>
         <nav className="flex-1 p-4 space-y-1">
           {navItems.map(item => (
