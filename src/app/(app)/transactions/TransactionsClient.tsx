@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { addTransaction, deleteTransaction } from './actions'
+import CSVImportClient from './CSVImportClient'
 
 const EXPENSE_CATEGORIES = [
   'Food & Dining', 'Transport', 'Housing', 'Health', 'Entertainment',
@@ -26,6 +27,7 @@ type Filter = 'all' | 'income' | 'expense'
 export default function TransactionsClient({ transactions }: { transactions: Transaction[] }) {
   const router = useRouter()
   const [showForm, setShowForm] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const [txType, setTxType] = useState<'expense' | 'income'>('expense')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -74,13 +76,26 @@ export default function TransactionsClient({ transactions }: { transactions: Tra
             {' '}expenses
           </p>
         </div>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
-        >
-          {showForm ? 'Cancel' : '+ Add'}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => { setShowImport(!showImport); setShowForm(false) }}
+            className="bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-sm font-semibold px-4 py-2 rounded-lg transition"
+          >
+            {showImport ? 'Cancel' : '↑ Import CSV'}
+          </button>
+          <button
+            onClick={() => { setShowForm(!showForm); setShowImport(false) }}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
+          >
+            {showForm ? 'Cancel' : '+ Add'}
+          </button>
+        </div>
       </div>
+
+      {/* CSV Import */}
+      {showImport && (
+        <CSVImportClient onClose={() => setShowImport(false)} />
+      )}
 
       {/* Add form */}
       {showForm && (
