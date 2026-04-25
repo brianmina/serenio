@@ -34,6 +34,13 @@ export default async function DashboardPage() {
 
   const netBalance = totalIncome - totalExpenses
 
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+  const daysElapsed = now.getDate()
+  const projectedIncome = daysElapsed > 0 ? (totalIncome / daysElapsed) * daysInMonth : 0
+  const projectedExpenses = daysElapsed > 0 ? (totalExpenses / daysElapsed) * daysInMonth : 0
+  const projectedNet = projectedIncome - projectedExpenses
+  const daysRemaining = daysInMonth - daysElapsed
+
   // Spending by category this month
   const byCategory = transactions
     .filter(t => t.type === 'expense')
@@ -77,6 +84,35 @@ export default async function DashboardPage() {
           <p className="text-sm font-medium text-gray-500">Total Expenses</p>
           <p className="text-3xl font-bold mt-1 text-orange-600">${totalExpenses.toFixed(2)}</p>
           <p className="text-xs text-gray-400 mt-1">This month</p>
+        </div>
+      </div>
+
+      {/* End-of-month projections */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-semibold text-gray-700">End-of-Month Projections</h3>
+            <p className="text-xs text-gray-400 mt-0.5">{daysRemaining} day{daysRemaining !== 1 ? 's' : ''} remaining · based on current pace</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="rounded-lg bg-blue-50 p-4">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Projected Income</p>
+            <p className="text-2xl font-bold text-blue-700 mt-1">${projectedIncome.toFixed(2)}</p>
+            <p className="text-xs text-gray-400 mt-1">${(projectedIncome - totalIncome).toFixed(2)} still expected</p>
+          </div>
+          <div className="rounded-lg bg-orange-50 p-4">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Projected Expenses</p>
+            <p className="text-2xl font-bold text-orange-600 mt-1">${projectedExpenses.toFixed(2)}</p>
+            <p className="text-xs text-gray-400 mt-1">${(projectedExpenses - totalExpenses).toFixed(2)} still expected</p>
+          </div>
+          <div className={`rounded-lg p-4 ${projectedNet >= 0 ? 'bg-emerald-50' : 'bg-red-50'}`}>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Projected Net</p>
+            <p className={`text-2xl font-bold mt-1 ${projectedNet >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+              {projectedNet < 0 ? '-' : ''}${Math.abs(projectedNet).toFixed(2)}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">Forecast by month end</p>
+          </div>
         </div>
       </div>
 
