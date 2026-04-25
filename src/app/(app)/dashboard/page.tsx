@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
+import BankConnectButton from './BankConnectButton'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -10,6 +11,12 @@ export default async function DashboardPage() {
     .select('username')
     .eq('id', user!.id)
     .single()
+
+  const { data: bankConnections } = await supabase
+    .from('bank_connections')
+    .select('id, institution_name, account_name, last_synced_at')
+    .eq('user_id', user!.id)
+    .order('created_at', { ascending: true })
 
   const now = new Date()
   const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
@@ -91,6 +98,9 @@ export default async function DashboardPage() {
           <p className="text-xs text-gray-400 mt-1">This month</p>
         </div>
       </div>
+
+      {/* Bank connections */}
+      <BankConnectButton connections={bankConnections ?? []} />
 
       {/* End-of-month projections */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
